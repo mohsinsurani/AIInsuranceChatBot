@@ -1,23 +1,24 @@
-# This is a sample Python script.
-
-# Press ⌃R to execute it or replace it with your code.
-# Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
 from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from starlette_graphene3 import GraphQLApp, make_graphiql_handler
-
+from strawberry.asgi import GraphQL
 from gql import gql, Client
 from gql.transport.requests import RequestsHTTPTransport
-import asyncio
-
-import graphene
-from graphene_file_upload.scalars import Upload
-
-from starlette.applications import Starlette
-from starlette_graphene3 import GraphQLApp, make_graphiql_handler
 import uvicorn
+from schema import schema
+from request_file import upload_files
 
 app = FastAPI()
+
+# CORS (Cross-Origin Resource Sharing) configuration for handling API requests from different origins.
+origins = ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # GraphQL configuration
 transport = RequestsHTTPTransport(
@@ -26,32 +27,37 @@ transport = RequestsHTTPTransport(
 )
 client = Client(transport=transport, fetch_schema_from_transport=True)
 
+# Add your file paths here
+file_paths = ['path/to/file1.pdf', 'path/to/file2.pdf']
+
+# Trigger file upload request
+response = upload_files(file_paths)
+
+
+
 # GraphQL schema for handling file uploads
-upload_mutation = gql(
-    """
+upload_mutation = gql("""
 mutation ($file: Upload!) {
   uploadFile(file: $file) {
     filename
   }
 }
-"""
-)
-
+""")
 
 # FastAPI route for file upload
-@app.post("/uploadfile/")
-async def create_upload_file(file: UploadFile = File(...)):
-    try:
-        # Use GraphQL to upload the file to the server
-        variables = {"file": file}
-        result = client.execute(upload_mutation, variable_values=variables)
-        return JSONResponse(content=result)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+# @app.post("/uploadfile/")
+# async def create_upload_file(file: UploadFile = File(...)):
+#     try:
+#         # Use GraphQL to upload the file to the server
+#         variables = {"file": file}
+#         result = client.execute(upload_mutation, variable_values=variables)
+#         return JSONResponse(content=result)
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
 
-schema = strawberry.Schema(query=Query)
 # GraphQL endpoint for handling queries and mutations
-app.add_route("/graphql", GraphQLApp(schema=app.schema))
+# app.add_route("/graphql", GraphQLApp(schema=app.schema))
+app.add_route("/graphql", GraphQL(schema=schema))
 
 # Press the green button in the gutter to run the script.
 if __name__ == "__main__":
